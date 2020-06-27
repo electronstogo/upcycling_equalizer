@@ -1,6 +1,7 @@
 #include <Adafruit_NeoPixel.h>
 
 
+// Point structure just describes one point in the LED matrix.
 struct Point
 {
   char x, y;
@@ -8,6 +9,7 @@ struct Point
   bool active;
 };
 
+// top point structure, that is used the falling down mode, of the top LEDs in every column.
 struct TopPoint
 {
   int position;
@@ -16,10 +18,14 @@ struct TopPoint
 
 
 
+// constants which define the matrix size.
 #define ROWS         10
 
 #define COLUMNS      7
 
+#define NUMPIXELS    ROWS * COLUMNS
+
+// pin constants for the spectrum analyzer chip.
 #define DATA_PIN     8
 
 #define STROBE_PIN   2
@@ -28,15 +34,19 @@ struct TopPoint
 
 #define ANALOG_PIN   0
 
-#define NUMPIXELS    ROWS * COLUMNS
 
+// create a matrix of ROWS * COLUMNS points.
+// This will be used as buffer, to flush the LEDs. 
 Point matrix[ROWS][COLUMNS];
 
+// array of top points, to handle falling mode for top LEDs in the columns.
 TopPoint arrayTop[COLUMNS];
 
+// array the keeps the spectrum levels.
 int spectrumValue[7];
 
-long int loopCounter = 0;
+// main loop counter, used to reduce function calls.  
+unsigned int loopCounter = 0;
 
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, DATA_PIN, NEO_RGB + NEO_KHZ800);
@@ -72,7 +82,7 @@ void loop()
   delay(5);
   digitalWrite(RESET_PIN, LOW);
 
-  for(int i=0; i < 7; i++)
+  for(int i = 0; i < 7; i++)
   {
     digitalWrite(STROBE_PIN, LOW);
     delay(10);
@@ -112,14 +122,14 @@ void loop()
   
   flushMatrix();
 
-  if(loopCounter % 2 ==0)topSinking();
+  if(loopCounter % 2 == 0)topSinking();
 }
 
 
-
+// handle the sinking mode, for the top LEDs in every column.
 void topSinking()
 {
-  for(int j = 0; j < ROWS; j++)
+  for(int j = 0; j < COLUMNS; j++)
   {
       if(arrayTop[j].position > 0 && arrayTop[j].pushed <= 0) arrayTop[j].position--;
       else if(arrayTop[j].pushed > 0) arrayTop[j].pushed--;  
@@ -127,7 +137,9 @@ void topSinking()
   
 }
 
-  void clearMatrix()
+
+// just clear the whole buffer for the LEDs.
+void clearMatrix()
 {
   for(int i = 0; i < ROWS; i++)
   {
@@ -140,6 +152,9 @@ void topSinking()
 }
 
 
+
+//  update the LED matrix, with the current buffer data.
+// Following describes the pattern, for LED control directions.
 // xxxxxxxxxxxxxx
 //            <--
 // xxxxxxxxxxxxxx
