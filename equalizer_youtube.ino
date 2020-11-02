@@ -4,156 +4,212 @@
 // Point structure just describes one point in the LED matrix.
 struct Point
 {
-  char x, y;
-  char r,g,b;
-  bool active;
+	//char x, y;
+	char r, g, b;
+	bool active;
 };
 
-// top point structure, that is used the falling down mode, of the top LEDs in every column.
+
+// top point structure, that is used to control the falling mode, of the top LEDs in every column.
 struct TopPoint
 {
-  int position;
-  int pushed;
+	int position;
+	
+	// pushed means that the level has reached a new top level,
+	// and the top LED will keep the position for at least a moment.
+	int pushed;
 };
 
 
 
-// constants which define the matrix size.
+// constants which define the LED matrix size.
 #define ROWS         10
 
 #define COLUMNS      7
 
 #define NUMPIXELS    ROWS * COLUMNS
 
-// pin constants for the spectrum analyzer chip.
-#define DATA_PIN     8
 
-#define STROBE_PIN   2
+// pin constants for LED control.
+#define LED_DATA_PIN 8 
+
+
+// pin constants for the spectrum analyzer chip msgeq7.
+#define STROBE_PIN   10
 
 #define RESET_PIN    3
 
 #define ANALOG_PIN   0
 
 
-// create a matrix of ROWS * COLUMNS points.
+
+// create a LED matrix of ROWS * COLUMNS points.
 // This will be used as buffer, to flush the LEDs. 
-Point matrix[ROWS][COLUMNS];
+Point g_led_matrix[ROWS][COLUMNS];
 
 // array of top points, to handle falling mode for top LEDs in the columns.
-TopPoint arrayTop[COLUMNS];
-
-// array the keeps the spectrum levels.
-int spectrumValue[7];
-
-// main loop counter, used to reduce function calls.  
-unsigned int loopCounter = 0;
+TopPoint g_array_top[COLUMNS];
 
 
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, DATA_PIN, NEO_RGB + NEO_KHZ800);
+// pixel control
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, LED_DATA_PIN, NEO_RGB + NEO_KHZ800);
+
+
+
 
 void setup() 
-{
-    pixels.begin();
-    pixels.show();
+{   
+	pixels.begin();
+	pixels.show();
 
-    pinMode      (STROBE_PIN, OUTPUT);
-    pinMode      (RESET_PIN,  OUTPUT);
-    pinMode      (ANALOG_PIN,    INPUT);
-   
-    digitalWrite (RESET_PIN,  LOW);
-    digitalWrite (STROBE_PIN, LOW);
-    delay        (1);
-   
-    digitalWrite (RESET_PIN,  HIGH);
-    delay        (1);
-    digitalWrite (RESET_PIN,  LOW);
-    digitalWrite (STROBE_PIN, HIGH);
-    delay        (1);
+	pinMode(STROBE_PIN, OUTPUT);
+	pinMode(RESET_PIN, OUTPUT);
+	pinMode(ANALOG_PIN, INPUT);
 
+	// init  msgeq7
+	digitalWrite(RESET_PIN, LOW);
+	digitalWrite(STROBE_PIN, LOW);
+	delay(1);
+
+	digitalWrite(RESET_PIN, HIGH);
+	delay(1);
+
+	digitalWrite(RESET_PIN, LOW);
+	digitalWrite(STROBE_PIN, HIGH);
+	delay(1);
+	
+	
+	for(int column = 0; column < COLUMNS; column++)
+	{
+		g_array_top[column].position = 0;
+		g_array_top[column].pushed = 0;
+		g_led_matrix[column][0].r = 254;
+	}
 }
+
+
 
 void loop() 
 {
-  loopCounter++;
+	// main loop counter, used to control function calls, for the top LED sinking mode.  
+	static unsigned int loop_counter = 0;
+
+
+	clear_led_matrix();
+
+	digitalWrite(RESET_PIN, HIGH);
+	delay(5);
+	digitalWrite(RESET_PIN, LOW);
+
+
+	// array to keep the spectrum levels.
+	int spectrum_value[7];
+
+
+	// get frequency levels.
+	for(int channel = 0; channel < 7; channel++)
+	{
+		digitalWrite(STROBE_PIN, LOW);
+		delay(10);
+		spectrum_value[channel] = analogRead(ANALOG_PIN);
+		
+		// remove noise.
+		if(spectrum_value[channel] < 100)
+		{
+			spectrum_value[channel] = 0;
+		}
+		
+		digitalWrite(STROBE_PIN, HIGH);
+
+		// map frequency value to LED height.
+		spectrum_value[channel] = constrain(spectrum_value[channel], 0, 1023);
+		spectrum_value[channel] = map(spectrum_value[channel], 0, 1023, 0, ROWS - 1);
+		
+		if(spectrum_value[channel] > 9)
+		{
+			spectrum_value[channel] = 9;
+		}
+		else if(spectrum_value[channel] < 0)
+		{
+			spectrum_value[channel] = 0;
+		}
+	}
+
+
+	// loop through all LED columns in the LED matrix.
+	for(int column = 0; column < COLUMNS; column++)
+	{
+		// loop through all LEDs in the current column, until the spectrum value top point is reached.
+		for(int row = 0; row < spectrum_value[column]; row++)
+		{
+			g_led_matrix[row][COLUMNS - 1 - column].active = true;
+			g_led_matrix[row][COLUMNS - 1 - column].b = 254;
+			g_led_matrix[row][COLUMNS - 1 - column].g = 0;
+			g_led_matrix[row][COLUMNS - 1 - column].r = 0;
+		}
+
+		
+		// check if the column got a new top level LED.
+		if(spectrum_value[column] >= g_array_top[column].position)
+		{
+			g_array_top[column].position = spectrum_value[column];
+			g_array_top[column].pushed = 6;
+		}
+		
+		g_led_matrix[g_array_top[column].position][COLUMNS - 1 - column].active = true;
+		g_led_matrix[g_array_top[column].position][COLUMNS - 1 - column].r = 254;
+		g_led_matrix[g_array_top[column].position][COLUMNS - 1 - column].g = 0;
+		g_led_matrix[g_array_top[column].position][COLUMNS - 1 - column].b = 0;
+	}
   
-  clearMatrix();
-  
-  digitalWrite(RESET_PIN, HIGH);
-  delay(5);
-  digitalWrite(RESET_PIN, LOW);
-
-  for(int i = 0; i < 7; i++)
-  {
-    digitalWrite(STROBE_PIN, LOW);
-    delay(10);
-    spectrumValue[i] = analogRead(ANALOG_PIN);
-    if(spectrumValue[i] < 100)spectrumValue[i] = 0;
-    digitalWrite(STROBE_PIN, HIGH);
-
-    spectrumValue[i] = constrain(spectrumValue[i], 0, 1023);
-    spectrumValue[i] = map(spectrumValue[i], 0, 1023, 0, ROWS);
-  }
+	flush_led_matrix();
 
 
-  for(int j = 0; j < COLUMNS; j++)
-  {
-      for(int i = 0; i < spectrumValue[j]; i++)
-      {
-          matrix[i][COLUMNS - 1 - j].active = true;
-          matrix[i][COLUMNS - 1 - j].r = 0; matrix[i][COLUMNS - 1 - j].g = 0; matrix[i][COLUMNS - 1 - j].b = 254;
-      }
-  
 
-
-  if(spectrumValue[j] - 1 > arrayTop[j].position)
-  {
-    matrix[spectrumValue[j] - 1][COLUMNS - 1 - j].r = 254; matrix[spectrumValue[j] - 1][COLUMNS - 1 - j].g = 0; matrix[spectrumValue[j] - 1][COLUMNS - 1 - j].b = 0;
-    arrayTop[j].position = spectrumValue[j] - 1;
-    arrayTop[j].pushed = 5;
-  }
-  else
-  {
-      matrix[arrayTop[j].position ][COLUMNS - 1 - j].active = true;
-      matrix[arrayTop[j].position][COLUMNS - 1 - j].r = 254; matrix[arrayTop[j].position][COLUMNS - 1 - j].g = 0; matrix[arrayTop[j].position][COLUMNS - 1 - j].b = 0;
-  }
-
-
-  }
-  
-  flushMatrix();
-
-  if(loopCounter % 2 == 0)topSinking();
+	if(loop_counter % 2)
+	{
+		top_sinking();
+	}
+	
+	
+	loop_counter++;
 }
 
 
 // handle the sinking mode, for the top LEDs in every column.
-void topSinking()
+void top_sinking()
 {
-  for(int j = 0; j < COLUMNS; j++)
-  {
-      if(arrayTop[j].position > 0 && arrayTop[j].pushed <= 0) arrayTop[j].position--;
-      else if(arrayTop[j].pushed > 0) arrayTop[j].pushed--;  
-  }
-  
-}
-
-
-// just clear the whole buffer for the LEDs.
-void clearMatrix()
-{
-  for(int i = 0; i < ROWS; i++)
-  {
-    for(int j = 0; j < COLUMNS; j++)
-    {
-      matrix[i][j].active = false;
-    }
-    
-  }
+	for(int column = 0; column < COLUMNS; column++)
+	{
+		if(g_array_top[column].position > 0 && g_array_top[column].pushed <= 0)
+		{
+			g_array_top[column].pushed = 0;
+			g_array_top[column].position--;
+		}
+		else if(g_array_top[column].pushed > 0)
+		{
+			g_array_top[column].pushed--;
+		}
+	}
 }
 
 
 
-//  update the LED matrix, with the current buffer data.
+// just clear the whole matrix buffer for the LEDs.
+void clear_led_matrix()
+{
+	for(int row = 0; row < ROWS; row++)
+	{
+		for(int column = 0; column < COLUMNS; column++)
+		{
+			g_led_matrix[row][column].active = false;
+		}
+	}
+}
+
+
+
+// Update the LED matrix, with the current buffer data.
 // Following describes the pattern, for LED control directions.
 // xxxxxxxxxxxxxx
 //            <--
@@ -166,45 +222,35 @@ void clearMatrix()
 // xxxxxxxxxxxxxx    
 //            <--
 
-void flushMatrix()
+void flush_led_matrix()
 {
-  for(int j = 0; j < COLUMNS; j++)
-  {
-
-    if( j % 2 != 0)
-    {
-      for(int i = 0; i < ROWS; i++)
-      {
-        if(matrix[ROWS - 1 - i][j].active)
-        {
-            pixels.setPixelColor(j * ROWS + i, pixels.Color(matrix[ROWS - 1 - i][j].r, matrix[ROWS - 1 - i][j].g, matrix[ROWS - 1 - i][j].b));
-          
-        }
-        else
-        {
-            pixels.setPixelColor( j * ROWS + i, 0, 0, 0);  
-        }
-      
-      }
-    }
-    else
-    {
-      for(int i = 0; i < ROWS; i++)
-      {
-        if(matrix[i][j].active)
-        {
-            pixels.setPixelColor(j * ROWS + i, pixels.Color(matrix[i][j].r, matrix[i][j].g, matrix[i][j].b));
-          
-        }
-        else
-        {
-            pixels.setPixelColor( j * ROWS + i, 0, 0, 0);  
-        }
-      }      
-    } 
-  }
+	// loop through the LED matrix columns.
+	for(int column = 0; column < COLUMNS; column++)
+	{
+		for(int row = 0; row < ROWS; row++)
+		{
+			// data direction of columns variies, because of the hardware wiring. Choose direction.
+			int corrected_row = row;
+		
+			if(column % 2)
+			{
+				corrected_row = ROWS - 1 - row;
+			}
+			
+			
+			// sendo color config to active LEDs 
+			if(g_led_matrix[corrected_row][column].active)
+			{
+				pixels.setPixelColor(column * ROWS + row, pixels.Color(g_led_matrix[corrected_row][column].r,
+				g_led_matrix[corrected_row][column].g, g_led_matrix[corrected_row][column].b));
+			}
+			else
+			{
+				pixels.setPixelColor(column * ROWS + row, 0, 0, 0);  
+			}
+		} 
+	}
 
 
-  pixels.show();
+	pixels.show();
 }
-
