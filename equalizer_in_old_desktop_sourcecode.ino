@@ -1,3 +1,5 @@
+// 2020 - electronstogo
+
 #include <Adafruit_NeoPixel.h>
 
 
@@ -92,7 +94,7 @@ void setup()
 void loop() 
 {
 	// main loop counter, used to control function calls, for the top LED sinking mode.  
-	static unsigned int loop_counter = 0;
+	static unsigned int s_loop_counter = 0;
 
 
 	clear_led_matrix();
@@ -166,13 +168,13 @@ void loop()
 
 
 
-	if(loop_counter % 2)
+	if(s_loop_counter % 2)
 	{
 		top_sinking();
 	}
 	
 	
-	loop_counter++;
+	s_loop_counter++;
 }
 
 
