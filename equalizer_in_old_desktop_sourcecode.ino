@@ -54,15 +54,15 @@ TopPoint g_array_top[COLUMNS];
 
 
 // pixel control
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, LED_DATA_PIN, NEO_RGB + NEO_KHZ800);
+Adafruit_NeoPixel g_pixels = Adafruit_NeoPixel(NUMPIXELS, LED_DATA_PIN, NEO_RGB + NEO_KHZ800);
 
 
 
 
 void setup() 
 {   
-	pixels.begin();
-	pixels.show();
+	g_pixels.begin();
+	g_pixels.show();
 
 	pinMode(STROBE_PIN, OUTPUT);
 	pinMode(RESET_PIN, OUTPUT);
@@ -243,16 +243,16 @@ void flush_led_matrix()
 			// sendo color config to active LEDs 
 			if(g_led_matrix[corrected_row][column].active)
 			{
-				pixels.setPixelColor(column * ROWS + row, pixels.Color(g_led_matrix[corrected_row][column].r,
+				g_pixels.setPixelColor(column * ROWS + row, g_pixels.Color(g_led_matrix[corrected_row][column].r,
 				g_led_matrix[corrected_row][column].g, g_led_matrix[corrected_row][column].b));
 			}
 			else
 			{
-				pixels.setPixelColor(column * ROWS + row, 0, 0, 0);  
+				g_pixels.setPixelColor(column * ROWS + row, 0, 0, 0);  
 			}
 		} 
 	}
 
 
-	pixels.show();
+	g_pixels.show();
 }
