@@ -26,9 +26,7 @@ struct TopPoint
 
 // constants which define the LED matrix size.
 #define ROWS         10
-
 #define COLUMNS      7
-
 #define NUMPIXELS    ROWS * COLUMNS
 
 
@@ -38,9 +36,7 @@ struct TopPoint
 
 // pin constants for the spectrum analyzer chip msgeq7.
 #define STROBE_PIN   10
-
 #define RESET_PIN    3
-
 #define ANALOG_PIN   0
 
 
@@ -104,44 +100,34 @@ void loop()
 	digitalWrite(RESET_PIN, LOW);
 
 
-	// array to keep the spectrum levels.
+	// Spectrum levels
 	int spectrum_value[7];
 
 
-	// get frequency levels.
+	// Get frequency levels.
 	for(int channel = 0; channel < 7; channel++)
 	{
 		digitalWrite(STROBE_PIN, LOW);
 		delay(10);
 		spectrum_value[channel] = analogRead(ANALOG_PIN);
 		
-		// remove noise.
-		if(spectrum_value[channel] < 100)
-		{
-			spectrum_value[channel] = 0;
-		}
+		// Remove noise.
+		spectrum_value[channel] = spectrum_value[channel] < 100 ? 0 : spectrum_value[channel];
 		
 		digitalWrite(STROBE_PIN, HIGH);
 
-		// map frequency value to LED height.
+		// Map frequency value to LED height.
 		spectrum_value[channel] = constrain(spectrum_value[channel], 0, 1023);
 		spectrum_value[channel] = map(spectrum_value[channel], 0, 1023, 0, ROWS - 1);
 		
-		if(spectrum_value[channel] > 9)
-		{
-			spectrum_value[channel] = 9;
-		}
-		else if(spectrum_value[channel] < 0)
-		{
-			spectrum_value[channel] = 0;
-		}
+		spectrum_value[channel] = spectrum_value[channel] > 9 ? 9 : spectrum_value[channel] < 0 ? 0 : spectrum_value[channel];
 	}
 
 
-	// loop through all LED columns in the LED matrix.
+	// Handle all LED columns.
 	for(int column = 0; column < COLUMNS; column++)
 	{
-		// loop through all LEDs in the current column, until the spectrum value top point is reached.
+		// Check all LEDs in the current column, until the spectrum value top point is reached.
 		for(int row = 0; row < spectrum_value[column]; row++)
 		{
 			g_led_matrix[row][COLUMNS - 1 - column].active = true;
@@ -151,7 +137,7 @@ void loop()
 		}
 
 		
-		// check if the column got a new top level LED.
+		// Check if the column got a new top level LED.
 		if(spectrum_value[column] >= g_array_top[column].position)
 		{
 			g_array_top[column].position = spectrum_value[column];
@@ -167,7 +153,6 @@ void loop()
 	flush_led_matrix();
 
 
-
 	if(s_loop_counter % 2)
 	{
 		top_sinking();
@@ -178,7 +163,7 @@ void loop()
 }
 
 
-// handle the sinking mode, for the top LEDs in every column.
+// Handle the sinking mode for the top LEDs in every column.
 void top_sinking()
 {
 	for(int column = 0; column < COLUMNS; column++)
@@ -226,19 +211,15 @@ void clear_led_matrix()
 
 void flush_led_matrix()
 {
-	// loop through the LED matrix columns.
+	// Handle all columns.
 	for(int column = 0; column < COLUMNS; column++)
 	{
 		for(int row = 0; row < ROWS; row++)
 		{
-			// data direction of columns variies, because of the hardware wiring. Choose direction.
+			// Data direction of columns variies because of the hardware wiring. Choose direction.
 			int corrected_row = row;
 		
-			if(column % 2)
-			{
-				corrected_row = ROWS - 1 - row;
-			}
-			
+			corrected_row = columns % 2 ? ROWS - 1 - row : corrected_row;
 			
 			// sendo color config to active LEDs 
 			if(g_led_matrix[corrected_row][column].active)
